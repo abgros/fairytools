@@ -1,10 +1,10 @@
 # Engine 1v1 tournament script
 
+import os
 from re import findall
-from os import getenv
 from dotenv import load_dotenv
 from time import time
-from random import randint
+from random import randint, choices
 
 import my_functions as my
 
@@ -73,21 +73,21 @@ if resign:
 # ----------------------------------------------------------------
 # SETUP
 
-sf_location = getenv('ENGINE_FILE')
-sf_location2 = getenv('ENGINE_FILE2')
-variants_file = getenv('VARIANTS_FILE')
-threads = getenv('THREADS')
+sf_location = os.getenv('ENGINE_FILE')
+sf_location2 = os.getenv('ENGINE_FILE2')
+variants_file = os.getenv('VARIANTS_FILE')
+threads = os.getenv('THREADS')
 
 if selfplay:
     engines = [my.engine(sf_location)]
-    engine_names = {engines[0]: sf_location.split('\\')[-1]}
+    engine_names = {engines[0]: os.path.basename(sf_location)}
 else:
     engines = [my.engine(sf_location), my.engine(sf_location2)]
-    engine_names = {engines[0]: sf_location.split('\\')[-1], engines[1]: sf_location2.split('\\')[-1]}
+    engine_names = {engines[0]: os.path.basename(sf_location), engines[1]: os.path.basename(sf_location2)}
     winners = {engines[0]: 0, engines[1]: 0}
 
 # Hash is divided between engines
-hash_size = int(getenv('HASH'))/len(engines)
+hash_size = int(os.getenv('HASH'))//len(engines)
 
 opening_fens = [None]
 if opening_book:
@@ -112,21 +112,21 @@ print(f"\nCommencing {n_games} game(s) of {variant if variant else 'chess'}.")
 print(f"Competing engines: {engine_names[engines[0]]} vs {engine_names[engines[-1]]}")
 
 if movetime:
-    print(f"Time control: {movetime} seconds per move.")
+    print(f"Time control: {movetime} seconds per move.\n")
 else:
-    print(f"Time control: {clock}+{inc}")
-print("")
-
+    print(f"Time control: {clock}+{inc}\n")
+    
 # ----------------------------------------------------------------
-# GENERATE PAIRINGS
+# GENERATE PAIRINGS & OPENINGS
 
 pairings = [(engines[i % len(engines)], engines[::-1][i % len(engines)]) for i in range(n_games)]
 
+# Generates a list of indices of opening_fens
 if opening_book:
     if do_random:
-        opening_list = [randint(1, len(opening_fens)) for i in range(n_games)]
+        opening_list = [randint(0, len(opening_fens)-1) for i in range(n_games)]
     else:
-        opening_list = [item for sublist in [[opening_fens[i % len(opening_fens)]] * opening_repeats for i in range(n_games)] for item in sublist][:n_games]
+        opening_list = my.flatten([[i % len(opening_fens)] * opening_repeats for i in range(n_games)])[:n_games]
 
 # ----------------------------------------------------------------
 # GAME LOOP
@@ -140,7 +140,7 @@ for i in range(n_games):
     result = None
 
     if opening_book:
-        custom_fen = opening_fens[opening_list[i]-1]
+        custom_fen = opening_fens[opening_list[i]]
 
     white_to_move = True
     if custom_fen:
@@ -265,7 +265,7 @@ for i in range(n_games):
 
     game_record = ""
     if opening_book:
-        game_record = f"[Position {opening_list[i]}] "
+        game_record = f"[Position {opening_list[i]+1}] "
     game_record += f"{' '.join(moves)} {codes[result]}\n"
     
     print(f"Game recorded: {game_record}\n")
@@ -274,7 +274,7 @@ for i in range(n_games):
     if write_to:
         with open(write_to, "a") as f:
             f.write(f"Game {i+1} ({engine_names[pairings[i][0]]}-{engine_names[pairings[i][1]]}): ")
-            f.write(game_record )
+            f.write(game_record)
 
 for e in engines:
     my.put(e, "quit")
