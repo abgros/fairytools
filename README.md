@@ -1,7 +1,7 @@
 # fairytools
 This is a collection of Python scripts to help with engine analysis of chess games and variants. In particular, it fully supports all variants you can configure with Fairy-Stockfish.
 
-Tested on: Python 3.9.5, Windows 10\
+Tested on: Python 3.10, Windows 10\
 Modules used: [dotenv](https://pypi.org/project/python-dotenv/), [anytree](https://pypi.org/project/anytree/)
 
 **960.txt** - This is an opening book of all Chess960 starting positions.\
