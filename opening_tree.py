@@ -2,7 +2,6 @@ from re import findall
 from os import getenv
 from dotenv import load_dotenv
 from time import time
-from random import randint
 from anytree import Node, RenderTree
 
 import my_functions as my
@@ -16,6 +15,8 @@ analysis_time = float(input("Enter the time (s) to spend analyzing: "))
 analysis_depth = int(input("Enter the number of plies to analyze: "))
 eval_thres = int(input("Enter the maximum acceptable centipawn loss: "))
 write_to = input("Enter file name to write game records to (or leave blank): ")
+if write_to:
+    write_fen = input("Write results as FEN rather than moves (Y/N): ").lower() == 'y'
 
 if not multi_pv: multi_pv = 500
 
@@ -34,7 +35,6 @@ hash_size = getenv('HASH')
 engine = my.engine(sf_location)
 
 my.put(engine, "uci")
-my.put(engine, "setoption name UCI_Chess960 value true")
 my.put(engine, f"setoption name Threads value {threads}")
 my.put(engine, f"setoption name Hash value {hash_size}")
 my.put(engine, f"setoption name MultiPv value {multi_pv}")
@@ -69,7 +69,7 @@ for i in range(analysis_depth):
             except:
                 std_output += my.get(engine)
 
-        possible_lines = std_output[-2:-2-int(std_output[-2].split()[6]):-1][::-1] # this is fine.
+        possible_lines = std_output[-2:-2-int(std_output[-2].split()[6]):-1][::-1]
         
         for line in possible_lines:
             cp_loss = int(possible_lines[0].split()[9]) - int(line.split()[9])
@@ -78,7 +78,7 @@ for i in range(analysis_depth):
             else:
                 variation.children += (Node(line.split()[line.split().index("pv")+1], cp_loss = cp_loss),)
             
-        print("Analyzed variation: START ->", path)
+        print(f"Analyzed variation: START -> {path} ({len(variation.children)} moves found)")
         
 print("\nOpening tree:")
 print(RenderTree(root).by_attr())
@@ -86,9 +86,29 @@ print(RenderTree(root).by_attr())
 # Write to file
 if write_to:
     for variation in root.leaves:
-        path = findall("'.*'", str(variation))[0][8:-1].replace('/', ' ')
+        output = findall("'.*'", str(variation))[0][8:-1].replace('/', ' ')
+
+        # Convert variations to FENs
+        if write_fen:
+            if custom_fen:
+                my.put(engine, f"position fen {custom_fen} moves {output}")
+            else:
+                my.put(engine, f"position startpos moves {output}")
+
+            my.put(engine, "d")
+            std_output = my.get(engine)
+            
+            while True:
+                try:
+                    if std_output[-1].startswith("Checkers:"):
+                        break
+                except:
+                    std_output += my.get(engine)
+
+            output = std_output[-4][5:]
+            
         with open(write_to, "a") as f:
-            f.write(path + "\n")
+            f.write(output + "\n")
 
 my.put(engine, "quit")
 
