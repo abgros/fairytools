@@ -24,3 +24,12 @@ def get(engine):
         if text != "":
             output += [text]
     return output
+
+def flatten(some_list):
+    output = []
+    for item in some_list:
+        if isinstance(item, list): 
+            output += flatten(item)
+        else: 
+            output += [item]
+    return output
