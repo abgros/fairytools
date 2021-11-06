@@ -35,6 +35,14 @@ else:
 if not do_random:
     opening_repeats = int(input("Enter the number of times to repeat each opening: "))
 
+alternate = False
+if not selfplay:
+    alternate = input("Alternate black and white engines? (Y/N) ").lower() == "y"
+
+    invert_order = False
+    if not alternate:
+        invert_order = input("Have the second engine play white? (Y/N) ").lower() == "y"
+
 write_to = input("Enter file name to write game records to (or leave blank): ")
 
 # Draw adjudication
@@ -119,7 +127,14 @@ else:
 # ----------------------------------------------------------------
 # GENERATE PAIRINGS & OPENINGS
 
-pairings = [(engines[i % len(engines)], engines[::-1][i % len(engines)]) for i in range(n_games)]
+if selfplay:
+    pairings = [(engines[0], engines[0])] * n_games
+elif alternate:
+    pairings = [(engines[i%2], engines[1 - i%2]) for i in range(n_games)]
+elif invert_order:
+    pairings = [(engines[1], engines[0])] * n_games
+else:
+    pairings = [(engines[0], engines[1])] * n_games
 
 # Generates a list of indices of opening_fens
 if opening_book:
@@ -132,22 +147,23 @@ if opening_book:
 # GAME LOOP
 
 for i in range(n_games):
+    moves = []
+    draw_counting = 0
+    
     if not movetime:
         w_clock = clock
         b_clock = clock
-    moves = []
-    draw_counting = 0
-    result = None
 
     if opening_book:
         custom_fen = opening_fens[opening_list[i]]
 
-    white_to_move = True
     if custom_fen:
         if custom_fen.split()[-5] == "b":
             white_to_move = False
         else:
             white_to_move = True
+    else:
+        white_to_move = True  
 
     # Checks that both engines are ready
     for e in engines:
@@ -156,6 +172,7 @@ for i in range(n_games):
     # MOVE LOOP
     while True:
         player = pairings[i][not white_to_move]
+        my.get(player)
         
         if custom_fen:
             my.put(player, f"position fen {custom_fen} moves {' '.join(moves)}")
@@ -168,16 +185,18 @@ for i in range(n_games):
             my.put(player, f"go wtime {w_clock*1000} btime {b_clock*1000} winc {inc*1000} binc {inc*1000}")
 
         start = time()
-        std_output = ["first"] # Prevents IndexError
 
         # Parse engine output
+        std_output = []
         while True:
-            if bestmove := findall('bestmove .+', std_output[-1]): 
-                bestmove = bestmove[0].split()[1]
-                engine_eval = findall("(?:cp|mate) [-]?\d+", ''.join(std_output))[-1].split() # Find the last occurrence
-                break
+            if std_output:                    
+                bestmove_found = findall('bestmove .+', std_output[-1])
+                if bestmove_found: 
+                    bestmove = bestmove_found[0].split()[1]
+                    engine_eval = findall("(?:cp|mate) [-]?\d+", ''.join(std_output))[-1].split() # Find the last occurrence
+                    break
             std_output += my.get(player)
-
+        
         # Clock
         timeused = time() - start
         if not movetime:
@@ -188,26 +207,30 @@ for i in range(n_games):
                 b_clock -= timeused
                 b_clock += inc           
 
+        # If side to move runs out of time
+        if not movetime:
+            if white_to_move:
+                if w_clock <= 0:
+                    print("White lost on time!")
+                    result = "Win"
+                    break
+            else:
+                if b_clock <= 0:
+                    print("Black lost on time!")
+                    result = "Win"
+                    break
+
         # If game is over (checkmate/stalemate)
+        if std_output[0] == "info depth 0 score mate 0": # hack
+            result = "Win"
+            break
+        
         if bestmove == "(none)":
             if engine_eval[0] == "mate":
                 result = "Win"
             else:
                 result = "Draw"
             break
-
-        # If side to move runs out of time
-        if not movetime:
-            if white_to_move:
-                if w_clock < 0:
-                    print("White lost on time!")
-                    result = "Win"
-                    break
-            else:
-                if b_clock < 0:
-                    print("Black lost on time!")
-                    result = "Win"
-                    break
             
         # Resign adjudication
         if resign:
@@ -250,19 +273,20 @@ for i in range(n_games):
     # Game result recorded
     if result == "Win":
         # The last side to move either resigned or was checkmated, thus the other side wins
-        result = ['Black', 'White'][not white_to_move]
+        result = ['White', 'Black'][white_to_move]
 
         if selfplay:
             print(f"{result} wins\n")
         else:
-            player = pairings[i][white_to_move]
-            winners[player] += 1
-
+            winning_engine = pairings[i][white_to_move]
+            winners[winning_engine] += 1
+            print(f"{engine_names[winning_engine]} ({result}) wins\n")
     else:
         print("Draw\n")
         
     result_count[result] += 1
 
+    # Generate game record
     game_record = ""
     if opening_book:
         game_record = f"[Position {opening_list[i]+1}] "
@@ -275,6 +299,9 @@ for i in range(n_games):
         with open(write_to, "a") as f:
             f.write(f"Game {i+1} ({engine_names[pairings[i][0]]}-{engine_names[pairings[i][1]]}): ")
             f.write(game_record)
+
+# ----------------------------------------------------------------
+# QUIT
 
 for e in engines:
     my.put(e, "quit")
