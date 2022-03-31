@@ -78,6 +78,14 @@ if resign:
     except:
         r_cp = -999999
 
+# NNUE Options
+nnues = []
+if selfplay:
+    nnues += [input("Enter a NNUE file to use (or leave blank): ")]
+else:
+    nnues += [input("Enter a NNUE file for the first engine to use (or leave blank): ")]
+    nnues += [input("Enter a NNUE file for the second engine to use (or leave blank): ")]
+
 # ----------------------------------------------------------------
 # SETUP
 
@@ -108,13 +116,14 @@ codes = {"White": "1-0", "Black": "0-1", "Draw": "1/2-1/2"}
 # ----------------------------------------------------------------
 # ENGINE START
 
-for e in engines:
-    my.put(e, "uci")
-    my.put(e, "setoption name UCI_Chess960 value true")
-    my.put(e, f"setoption name Threads value {threads}")
-    my.put(e, f"setoption name Hash value {hash_size}")
-    my.put(e, f"load {variants_file}")
-    if variant: my.put(e, f"setoption name UCI_Variant value {variant}")
+for i in range(len(engines)):
+    my.put(engines[i], "uci")
+    my.put(engines[i], "setoption name UCI_Chess960 value true")
+    my.put(engines[i], f"setoption name Threads value {threads}")
+    my.put(engines[i], f"setoption name Hash value {hash_size}")
+    my.put(engines[i], f"load {variants_file}")
+    if variant: my.put(engines[i], f"setoption name UCI_Variant value {variant}")
+    if nnues[i]: my.put(engines[i], f"setoption name EvalFile value {nnues[i]}")
 
 print(f"\nCommencing {n_games} game(s) of {variant if variant else 'chess'}.")
 print(f"Competing engines: {engine_names[engines[0]]} vs {engine_names[engines[-1]]}")
