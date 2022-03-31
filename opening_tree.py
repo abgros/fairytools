@@ -15,6 +15,8 @@ analysis_time = float(input("Enter the time (s) to spend analyzing: "))
 analysis_depth = int(input("Enter the number of plies to analyze: "))
 eval_thres = int(input("Enter the maximum acceptable centipawn loss: "))
 write_to = input("Enter file name to write game records to (or leave blank): ")
+nnue = input("Enter a NNUE file to use (or leave blank): ")
+
 if write_to:
     write_fen = input("Write results as FEN rather than moves (Y/N): ").lower() == 'y'
 
@@ -40,6 +42,7 @@ my.put(engine, f"setoption name Hash value {hash_size}")
 my.put(engine, f"setoption name MultiPv value {multi_pv}")
 my.put(engine, f"load {variants_file}")
 if variant: my.put(engine, f"setoption name UCI_Variant value {variant}")
+if nnue: my.put(engine, f"setoption name EvalFile value {nnue}")
 
 # ----------------------------------------------------------------
 # SEARCH LOOP
